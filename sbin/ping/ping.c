@@ -200,6 +200,7 @@ static double tmin = 999999999.0;	/* minimum round trip time */
 static double tmax = 0.0;	/* maximum round trip time */
 static double tsum = 0.0;	/* sum of all times, for doing average */
 static double tsumsq = 0.0;	/* sum of all times squared, for std. dev. */
+struct tv32 tv32_offset;
 
 /* nonzero if we've been told to finish up */
 static volatile sig_atomic_t finish_up;
@@ -638,7 +639,7 @@ main(int argc, char *const *argv)
 		for (i = TIMEVAL_LEN; i < datalen; ++i)
 			*datap++ = i;
 
-	ident = getpid() & 0xFFFF;
+	ident = arc4random() & 0xFFFF;
 
 	hold = 1;
 	if (options & F_SO_DEBUG) {
@@ -828,6 +829,8 @@ main(int argc, char *const *argv)
 		else
 			(void)printf("PING %s: %d data bytes\n", hostname, datalen);
 	}
+
+	arc4random_buf(&tv32_offset, sizeof(tv32_offset));
 
 	/*
 	 * Use sigaction() instead of signal() to get unambiguous semantics,
@@ -1029,11 +1032,11 @@ pinger(void)
 	if ((options & F_TIME) || timing) {
 		(void)gettimeofday(&now, NULL);
 
-		tv32.tv32_sec = htonl(now.tv_sec);
-		tv32.tv32_usec = htonl(now.tv_usec);
+		tv32.tv32_sec = htonl(now.tv_sec + tv32_offset.tv32_sec);
+		tv32.tv32_usec = htonl(now.tv_usec + tv32_offset.tv32_usec);
 		if (options & F_TIME)
-			icp->icmp_otime = htonl((now.tv_sec % (24*60*60))
-				* 1000 + now.tv_usec / 1000);
+			icp->icmp_otime = htonl((now.tv_sec + tv32_offset.tv32_sec % (24*60*60))
+				* 1000 + now.tv_usec + tv32_offset.tv32_usec / 1000);
 		if (timing)
 			bcopy((void *)&tv32,
 			    (void *)&outpack[ICMP_MINLEN + phdr_len],
@@ -1124,8 +1127,8 @@ pr_pack(char *buf, int cc, struct sockaddr_in *from, struct timeval *tv)
 			    sizeof(tv1)) {
 				/* Copy to avoid alignment problems: */
 				memcpy(&tv32, tp, sizeof(tv32));
-				tv1.tv_sec = ntohl(tv32.tv32_sec);
-				tv1.tv_usec = ntohl(tv32.tv32_usec);
+				tv1.tv_sec = ntohl(tv32.tv32_sec) - tv32_offset.tv32_sec;
+				tv1.tv_usec = ntohl(tv32.tv32_usec) - tv32_offset.tv32_usec;
 				tvsub(tv, &tv1);
  				triptime = ((double)tv->tv_sec) * 1000.0 +
  				    ((double)tv->tv_usec) / 1000.0;
