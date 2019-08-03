@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2018 Alexander Motin <mav@FreeBSD.org>
+.\" Copyright (c) 2018-2019 Alexander Motin <mav@FreeBSD.org>
 .\" Copyright (c) 2012 Intel Corporation
 .\" All rights reserved.
 .\"
@@ -34,7 +34,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd December 7, 2018
+.Dd August 2, 2019
 .Dt NVMECONTROL 8
 .Os
 .Sh NAME
@@ -66,6 +66,58 @@
 .Op Fl x
 .Op Fl v Ar vendor-string
 .Op Fl b
+.Op Fl f Ar LSP
+.Op Fl i Ar LSI
+.Op Fl r
+.Aq device id
+.Aq namespace id
+.Nm
+.Ic ns active
+.Aq device id
+.Nm
+.Ic ns allocated
+.Aq device id
+.Nm
+.Ic ns attach
+.Aq Fl n Ar nsid
+.Aq Fl c Ar cntid
+.Aq device id
+.Nm
+.Ic ns attached
+.Aq Fl n Ar nsid
+.Aq device id
+.Nm
+.Ic ns controllers
+.Aq device id
+.Nm
+.Ic ns create
+.Aq Fl s Ar nsze
+.Op Fl c Ar ncap
+.Op Fl f Ar lbaf
+.Op Fl m Ar mset
+.Op Fl n Ar nmic
+.Op Fl p Ar pi
+.Op Fl l Ar pil
+.Op Fl L Ar flbas
+.Op Fl d Ar dps
+.Aq device id
+.Nm
+.Ic ns delete
+.Aq Fl n Ar nsid
+.Aq device id
+.Nm
+.Ic ns detach
+.Aq Fl n Ar nsid
+.Aq Fl c Ar cntid
+.Aq device id
+.Nm
+.Ic ns identify
+.Op Fl v
+.Op Fl x
+.Aq Fl n Ar nsid
+.Aq device id
+.Nm
+.Ic nsid
 .Aq device id
 .Aq namespace id
 .Nm
@@ -123,6 +175,14 @@ Drive Error Log
 Health/SMART Data
 .It Dv Page 0x03
 Firmware Information
+.It Dv Page 0x04
+Changed Namespace List
+.It Dv Page 0x05
+Commands Supported and Effects
+.It Dv Page 0x80
+Reservation Notification
+.It Dv Page 0x81
+Sanitize Status
 .It Dv Page 0xc1
 Advanced SMART information (WDC/HGST)
 .It Dv Page 0xc1
@@ -136,13 +196,23 @@ Advanced SMART information (Intel)
 .El
 .Pp
 Specifying
-.Fl p
+.Fl v
 .Ic help
 will list all valid vendors and pages.
 .Fl x
 will print the page as hex.
 .Fl b
 will print the binary data for the page.
+.Fl s
+will set Log Specific Field.
+.Fl i
+will set Log Specific Identifier.
+.Fl r
+will set Retain Asynchronous Event.
+.Ss ns
+Various namespace management commands.
+If namespace management is supported by device, allow list, create and delete
+namespaces, list, attach and detach controllers to namespaces.
 .Ss format
 Format either specified namespace, or all namespaces of specified controller,
 using specified parameters:
