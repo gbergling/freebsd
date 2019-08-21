@@ -99,6 +99,8 @@ __FBSDID("$FreeBSD$");
 #include <time.h>
 #include <unistd.h>
 
+#include "utils.h"
+
 #define	INADDR_LEN	((int)sizeof(in_addr_t))
 #define	TIMEVAL_LEN	((int)sizeof(struct tv32))
 #define	MASK_LEN	(ICMP_MASKLEN - ICMP_MINLEN)
@@ -210,7 +212,6 @@ static volatile sig_atomic_t siginfo_p;
 static cap_channel_t *capdns;
 
 static void fill(char *, char *);
-static u_short in_cksum(u_short *, int);
 static cap_channel_t *capdns_setup(void);
 static void check_status(void);
 static void finish(void) __dead2;
@@ -610,6 +611,7 @@ main(int argc, char *const *argv)
 	}
 
 	/* From now on we will use only reverse DNS lookups. */
+#ifdef WITH_CASPER
 	if (capdns != NULL) {
 		const char *types[1];
 
@@ -617,7 +619,7 @@ main(int argc, char *const *argv)
 		if (cap_dns_type_limit(capdns, types, 1) < 0)
 			err(1, "unable to limit access to system.dns service");
 	}
-
+#endif
 	if (connect(ssend, (struct sockaddr *)&whereto, sizeof(whereto)) != 0)
 		err(1, "connect");
 
@@ -761,9 +763,15 @@ main(int argc, char *const *argv)
 		}
 	}
 #ifdef SO_TIMESTAMP
-	{ int on = 1;
-	if (setsockopt(srecv, SOL_SOCKET, SO_TIMESTAMP, &on, sizeof(on)) < 0)
-		err(EX_OSERR, "setsockopt SO_TIMESTAMP");
+	{
+		int on = 1;
+		int ts_clock = SO_TS_MONOTONIC;
+		if (setsockopt(srecv, SOL_SOCKET, SO_TIMESTAMP, &on,
+		    sizeof(on)) < 0)
+			err(EX_OSERR, "setsockopt SO_TIMESTAMP");
+		if (setsockopt(srecv, SOL_SOCKET, SO_TS_CLOCK, &ts_clock,
+		    sizeof(ts_clock)) < 0)
+			err(EX_OSERR, "setsockopt SO_TS_CLOCK");
 	}
 #endif
 	if (sweepmax) {
@@ -1050,13 +1058,13 @@ pinger(void)
 	cc = ICMP_MINLEN + phdr_len + datalen;
 
 	/* compute ICMP checksum here */
-	icp->icmp_cksum = in_cksum((u_short *)icp, cc);
+	icp->icmp_cksum = in_cksum((u_char *)icp, cc);
 
 	if (options & F_HDRINCL) {
 		cc += sizeof(struct ip);
 		ip = (struct ip *)outpackhdr;
 		ip->ip_len = htons(cc);
-		ip->ip_sum = in_cksum((u_short *)outpackhdr, cc);
+		ip->ip_sum = in_cksum(outpackhdr, cc);
 		packet = outpackhdr;
 	}
 	i = send(ssend, (char *)packet, cc, 0);
@@ -1170,8 +1178,7 @@ pr_pack(char *buf, int cc, struct sockaddr_in *from, struct timespec *tv)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			(void)printf("%d bytes from %s: icmp_seq=%u", cc,
-			   inet_ntoa(*(struct in_addr *)&from->sin_addr.s_addr),
-			   seq);
+			    pr_addr(from->sin_addr), seq);
 			(void)printf(" ttl=%d", ip->ip_ttl);
 			if (timing)
 				(void)printf(" time=%.3f ms", triptime);
@@ -1345,49 +1352,6 @@ pr_pack(char *buf, int cc, struct sockaddr_in *from, struct timespec *tv)
 		(void)putchar('\n');
 		(void)fflush(stdout);
 	}
-}
-
-/*
- * in_cksum --
- *	Checksum routine for Internet Protocol family headers (C Version)
- */
-u_short
-in_cksum(u_short *addr, int len)
-{
-	int nleft, sum;
-	u_short *w;
-	union {
-		u_short	us;
-		u_char	uc[2];
-	} last;
-	u_short answer;
-
-	nleft = len;
-	sum = 0;
-	w = addr;
-
-	/*
-	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
-	 * sequential 16 bit words to it, and at the end, fold back all the
-	 * carry bits from the top 16 bits into the lower 16 bits.
-	 */
-	while (nleft > 1)  {
-		sum += *w++;
-		nleft -= 2;
-	}
-
-	/* mop up an odd byte, if necessary */
-	if (nleft == 1) {
-		last.uc[0] = *(u_char *)w;
-		last.uc[1] = 0;
-		sum += last.us;
-	}
-
-	/* add back carry outs from top 16 bits to low 16 bits */
-	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
-	sum += (sum >> 16);			/* add carry */
-	answer = ~sum;				/* truncate to 16 bits */
-	return(answer);
 }
 
 /*
@@ -1707,7 +1671,7 @@ pr_retip(struct ip *ip)
 static char *
 pr_ntime(n_time timestamp)
 {
-	static char buf[10];
+	static char buf[11];
 	int hour, min, sec;
 
 	sec = ntohl(timestamp) / 1000;
@@ -1755,9 +1719,10 @@ static cap_channel_t *
 capdns_setup(void)
 {
 	cap_channel_t *capcas, *capdnsloc;
+#ifdef WITH_CASPER
 	const char *types[2];
 	int families[1];
-
+#endif
 	capcas = cap_init();
 	if (capcas == NULL)
 		err(1, "unable to create casper process");
@@ -1766,6 +1731,7 @@ capdns_setup(void)
 	cap_close(capcas);
 	if (capdnsloc == NULL)
 		err(1, "unable to open system.dns service");
+#ifdef WITH_CASPER
 	types[0] = "NAME2ADDR";
 	types[1] = "ADDR2NAME";
 	if (cap_dns_type_limit(capdnsloc, types, 2) < 0)
@@ -1773,7 +1739,7 @@ capdns_setup(void)
 	families[0] = AF_INET;
 	if (cap_dns_family_limit(capdnsloc, families, 1) < 0)
 		err(1, "unable to limit access to system.dns service");
-
+#endif
 	return (capdnsloc);
 }
 

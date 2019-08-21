@@ -135,7 +135,11 @@ static int vm_pageproc_waiters;
  */
 vm_page_t bogus_page;
 
+#ifdef PMAP_HAS_PAGE_ARRAY
+vm_page_t vm_page_array = (vm_page_t)PA_MIN_ADDRESS;
+#else
 vm_page_t vm_page_array;
+#endif
 long vm_page_array_size;
 long first_page;
 
@@ -522,6 +526,31 @@ vm_page_init_page(vm_page_t m, vm_paddr_t pa, int segind)
 	pmap_page_init(m);
 }
 
+#ifndef PMAP_HAS_PAGE_ARRAY
+static vm_paddr_t
+vm_page_array_alloc(vm_offset_t *vaddr, vm_paddr_t end, vm_paddr_t page_range)
+{
+	vm_paddr_t new_end;
+
+	/*
+	 * Reserve an unmapped guard page to trap access to vm_page_array[-1].
+	 * However, because this page is allocated from KVM, out-of-bounds
+	 * accesses using the direct map will not be trapped.
+	 */
+	*vaddr += PAGE_SIZE;
+
+	/*
+	 * Allocate physical memory for the page structures, and map it.
+	 */
+	new_end = trunc_page(end - page_range * sizeof(struct vm_page));
+	vm_page_array = (vm_page_t)pmap_map(vaddr, new_end, end,
+	    VM_PROT_READ | VM_PROT_WRITE);
+	vm_page_array_size = page_range;
+
+	return (new_end);
+}
+#endif
+
 /*
  *	vm_page_startup:
  *
@@ -538,7 +567,7 @@ vm_page_startup(vm_offset_t vaddr)
 	char *list, *listend;
 	vm_offset_t mapped;
 	vm_paddr_t end, high_avail, low_avail, new_end, page_range, size;
-	vm_paddr_t biggestsize, last_pa, pa;
+	vm_paddr_t last_pa, pa;
 	u_long pagecount;
 	int biggestone, i, segind;
 #ifdef WITNESS
@@ -548,22 +577,10 @@ vm_page_startup(vm_offset_t vaddr)
 	long ii;
 #endif
 
-	biggestsize = 0;
-	biggestone = 0;
 	vaddr = round_page(vaddr);
 
-	for (i = 0; phys_avail[i + 1]; i += 2) {
-		phys_avail[i] = round_page(phys_avail[i]);
-		phys_avail[i + 1] = trunc_page(phys_avail[i + 1]);
-	}
-	for (i = 0; phys_avail[i + 1]; i += 2) {
-		size = phys_avail[i + 1] - phys_avail[i];
-		if (size > biggestsize) {
-			biggestone = i;
-			biggestsize = size;
-		}
-	}
-
+	vm_phys_early_startup();
+	biggestone = vm_phys_avail_largest();
 	end = phys_avail[biggestone+1];
 
 	/*
@@ -705,6 +722,11 @@ vm_page_startup(vm_offset_t vaddr)
 #error "Either VM_PHYSSEG_DENSE or VM_PHYSSEG_SPARSE must be defined."
 #endif
 
+#ifdef PMAP_HAS_PAGE_ARRAY
+	pmap_page_array_startup(size / PAGE_SIZE);
+	biggestone = vm_phys_avail_largest();
+	end = new_end = phys_avail[biggestone + 1];
+#else
 #ifdef VM_PHYSSEG_DENSE
 	/*
 	 * In the VM_PHYSSEG_DENSE case, the number of pages can account for
@@ -735,31 +757,15 @@ vm_page_startup(vm_offset_t vaddr)
 		}
 	}
 	end = new_end;
-
-	/*
-	 * Reserve an unmapped guard page to trap access to vm_page_array[-1].
-	 * However, because this page is allocated from KVM, out-of-bounds
-	 * accesses using the direct map will not be trapped.
-	 */
-	vaddr += PAGE_SIZE;
-
-	/*
-	 * Allocate physical memory for the page structures, and map it.
-	 */
-	new_end = trunc_page(end - page_range * sizeof(struct vm_page));
-	mapped = pmap_map(&vaddr, new_end, end,
-	    VM_PROT_READ | VM_PROT_WRITE);
-	vm_page_array = (vm_page_t)mapped;
-	vm_page_array_size = page_range;
+	new_end = vm_page_array_alloc(&vaddr, end, page_range);
+#endif
 
 #if VM_NRESERVLEVEL > 0
 	/*
 	 * Allocate physical memory for the reservation management system's
 	 * data structures, and map it.
 	 */
-	if (high_avail == end)
-		high_avail = new_end;
-	new_end = vm_reserv_startup(&vaddr, new_end, high_avail);
+	new_end = vm_reserv_startup(&vaddr, new_end);
 #endif
 #if defined(__aarch64__) || defined(__amd64__) || defined(__mips__) || \
     defined(__riscv)
@@ -776,7 +782,8 @@ vm_page_startup(vm_offset_t vaddr)
 	 * physical pages.
 	 */
 	for (i = 0; phys_avail[i + 1] != 0; i += 2)
-		vm_phys_add_seg(phys_avail[i], phys_avail[i + 1]);
+		if (vm_phys_avail_size(i) != 0)
+			vm_phys_add_seg(phys_avail[i], phys_avail[i + 1]);
 
 	/*
 	 * Initialize the physical memory allocator.
@@ -3032,7 +3039,7 @@ vm_domain_alloc_fail(struct vm_domain *vmd, vm_object_t object, int req)
  *	  this balance without careful testing first.
  */
 void
-vm_waitpfault(struct domainset *dset)
+vm_waitpfault(struct domainset *dset, int timo)
 {
 
 	/*
@@ -3044,26 +3051,20 @@ vm_waitpfault(struct domainset *dset)
 	if (vm_page_count_min_set(&dset->ds_mask)) {
 		vm_min_waiters++;
 		msleep(&vm_min_domains, &vm_domainset_lock, PUSER | PDROP,
-		    "pfault", 0);
+		    "pfault", timo);
 	} else
 		mtx_unlock(&vm_domainset_lock);
 }
 
-struct vm_pagequeue *
+static struct vm_pagequeue *
 vm_page_pagequeue(vm_page_t m)
 {
 
-	return (&vm_pagequeue_domain(m)->vmd_pagequeues[m->queue]);
-}
-
-static struct mtx *
-vm_page_pagequeue_lockptr(vm_page_t m)
-{
 	uint8_t queue;
 
 	if ((queue = atomic_load_8(&m->queue)) == PQ_NONE)
 		return (NULL);
-	return (&vm_pagequeue_domain(m)->vmd_pagequeues[queue].pq_mutex);
+	return (&vm_pagequeue_domain(m)->vmd_pagequeues[queue]);
 }
 
 static inline void
@@ -3086,10 +3087,8 @@ vm_pqbatch_process_page(struct vm_pagequeue *pq, vm_page_t m)
 	    m, pq, qflags));
 
 	if ((qflags & PGA_DEQUEUE) != 0) {
-		if (__predict_true((qflags & PGA_ENQUEUED) != 0)) {
-			TAILQ_REMOVE(&pq->pq_pl, m, plinks.q);
-			vm_pagequeue_cnt_dec(pq);
-		}
+		if (__predict_true((qflags & PGA_ENQUEUED) != 0))
+			vm_pagequeue_remove(pq, m);
 		vm_page_dequeue_complete(m);
 	} else if ((qflags & (PGA_REQUEUE | PGA_REQUEUE_HEAD)) != 0) {
 		if ((qflags & PGA_ENQUEUED) != 0)
@@ -3292,16 +3291,14 @@ vm_page_dequeue_deferred_free(vm_page_t m)
 void
 vm_page_dequeue(vm_page_t m)
 {
-	struct mtx *lock, *lock1;
-	struct vm_pagequeue *pq;
+	struct vm_pagequeue *pq, *pq1;
 	uint8_t aflags;
 
-	KASSERT(mtx_owned(vm_page_lockptr(m)) || m->order == VM_NFREEORDER,
+	KASSERT(mtx_owned(vm_page_lockptr(m)) || m->object == NULL,
 	    ("page %p is allocated and unlocked", m));
 
-	for (;;) {
-		lock = vm_page_pagequeue_lockptr(m);
-		if (lock == NULL) {
+	for (pq = vm_page_pagequeue(m);; pq = pq1) {
+		if (pq == NULL) {
 			/*
 			 * A thread may be concurrently executing
 			 * vm_page_dequeue_complete().  Ensure that all queue
@@ -3320,27 +3317,24 @@ vm_page_dequeue(vm_page_t m)
 			 * critical section.
 			 */
 			cpu_spinwait();
+			pq1 = vm_page_pagequeue(m);
 			continue;
 		}
-		mtx_lock(lock);
-		if ((lock1 = vm_page_pagequeue_lockptr(m)) == lock)
+		vm_pagequeue_lock(pq);
+		if ((pq1 = vm_page_pagequeue(m)) == pq)
 			break;
-		mtx_unlock(lock);
-		lock = lock1;
+		vm_pagequeue_unlock(pq);
 	}
-	KASSERT(lock == vm_page_pagequeue_lockptr(m),
+	KASSERT(pq == vm_page_pagequeue(m),
 	    ("%s: page %p migrated directly between queues", __func__, m));
 	KASSERT((m->aflags & PGA_DEQUEUE) != 0 ||
 	    mtx_owned(vm_page_lockptr(m)),
 	    ("%s: queued unlocked page %p", __func__, m));
 
-	if ((m->aflags & PGA_ENQUEUED) != 0) {
-		pq = vm_page_pagequeue(m);
-		TAILQ_REMOVE(&pq->pq_pl, m, plinks.q);
-		vm_pagequeue_cnt_dec(pq);
-	}
+	if ((m->aflags & PGA_ENQUEUED) != 0)
+		vm_pagequeue_remove(pq, m);
 	vm_page_dequeue_complete(m);
-	mtx_unlock(lock);
+	vm_pagequeue_unlock(pq);
 }
 
 /*
