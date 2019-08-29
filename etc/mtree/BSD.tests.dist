@@ -442,6 +442,8 @@
         ..
         ping
         ..
+        ping6
+        ..
     ..
     secure
         lib
@@ -1077,6 +1079,8 @@
         fstyp
         ..
         makefs
+        ..
+        mixer
         ..
         newsyslog
         ..
