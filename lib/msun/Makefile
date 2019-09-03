@@ -126,7 +126,9 @@ COMMON_SRCS+=	catrig.c catrigf.c \
 	s_conj.c s_conjf.c s_conjl.c \
 	s_cpow.c s_cpowf.c s_cpowl.c \
 	s_cproj.c s_cprojf.c s_creal.c s_crealf.c s_creall.c \
-	s_csinh.c s_csinhf.c s_ctanh.c s_ctanhf.c
+	s_csinh.c s_csinhf.c s_csinhl.c s_csinl.c \
+	s_ctanh.c s_ctanhf.c s_ctanhl.c s_ctanl.c \
+	s_ccoshl.c s_ccosl.c s_ccosf.c s_ccos.c
 
 # FreeBSD's C library supplies these functions:
 #COMMON_SRCS+=	s_fabs.c s_frexp.c s_isnan.c s_ldexp.c s_modf.c
@@ -153,7 +155,7 @@ MAN=	acos.3 acosh.3 asin.3 asinh.3 atan.3 atan2.3 atanh.3 \
 	nextafter.3 remainder.3 rint.3 \
 	round.3 scalbn.3 signbit.3 sin.3 sincos.3 \
 	sinh.3 sqrt.3 tan.3 tanh.3 trunc.3 \
-	complex.3
+	complex.3 csin.3 csinh.3 ctan.3 ctanh.3
 
 MLINKS+=acos.3 acosf.3 acos.3 acosl.3
 MLINKS+=acosh.3 acoshf.3 acosh.3 acoshl.3
@@ -169,9 +171,10 @@ MLINKS+=cacos.3 cacosf.3 cacos.3 cacosl.3 \
 	cacos.3 casinh.3 cacos.3 casinhf.3 cacos.3 casinhl.3 \
 	cacos.3 catan.3 cacos.3 catanf.3 cacos.3 catanl.3 \
 	cacos.3 catanh.3 cacos.3 catanhf.3 cacos.3 catanhl.3
-MLINKS+=ccos.3 ccosf.3 ccos.3 csin.3 ccos.3 csinf.3 ccos.3 ctan.3 ccos.3 ctanf.3
+MLINKS+=ccos.3 ccosf.3 ccos.3 csin.3 ccos.3 csinf.3 ccos.3 ctan.3 \
+	ccos.3 ctanf.3 ccos.3 ccosl.3 ccos.3 ccosf.3
 MLINKS+=ccosh.3 ccoshf.3 ccosh.3 csinh.3 ccosh.3 csinhf.3 \
-	ccosh.3 ctanh.3 ccosh.3 ctanhf.3
+	ccosh.3 ctanh.3 ccosh.3 ctanhf.3 ccosh.3 ccoshl.3
 MLINKS+=ceil.3 ceilf.3 ceil.3 ceill.3
 MLINKS+=cexp.3 cexpf.3
 MLINKS+=cimag.3 cimagf.3 cimag.3 cimagl.3 \
@@ -239,6 +242,10 @@ MLINKS+=sqrt.3 cbrt.3 sqrt.3 cbrtf.3 sqrt.3 cbrtl.3 sqrt.3 sqrtf.3 \
 MLINKS+=tan.3 tanf.3 tan.3 tanl.3
 MLINKS+=tanh.3 tanhf.3 tanh.3 tanhl.3
 MLINKS+=trunc.3 truncf.3 trunc.3 truncl.3
+MLINKS+=csin.3 csinf.3 csin.3 csinl.3
+MLINKS+=csinh.3 csinhf.3 csinh.3 csinhl.3
+MLINKS+=ctan.3 ctanf.3 ctan.3 ctanl.3
+MLINKS+=ctanh.3 ctanhf.3 ctanh.3 ctanhl.3
 
 .include <src.opts.mk>
 
