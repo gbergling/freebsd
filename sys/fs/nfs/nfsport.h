@@ -690,6 +690,8 @@ void nfsrvd_rcv(struct socket *, void *, int);
 #define	NFSUNLOCKNODE(n)	mtx_unlock(&((n)->n_mtx))
 #define	NFSLOCKMNT(m)		mtx_lock(&((m)->nm_mtx))
 #define	NFSUNLOCKMNT(m)		mtx_unlock(&((m)->nm_mtx))
+#define	NFSLOCKIOD()		mtx_lock(&ncl_iod_mutex)
+#define	NFSUNLOCKIOD()		mtx_unlock(&ncl_iod_mutex)
 #define	NFSLOCKREQUEST(r)	mtx_lock(&((r)->r_mtx))
 #define	NFSUNLOCKREQUEST(r)	mtx_unlock(&((r)->r_mtx))
 #define	NFSLOCKSOCKREQ(r)	mtx_lock(&((r)->nr_mtx))
@@ -855,11 +857,11 @@ MALLOC_DECLARE(M_NEWNFSDSESSION);
 #define	NFSWRITERPC_SETTIME(w, n, a, v4)				\
 	do {								\
 		if (w) {						\
-			mtx_lock(&((n)->n_mtx));			\
+			NFSLOCKNODE(n);					\
 			(n)->n_mtime = (a)->na_mtime;			\
 			if (v4)						\
 				(n)->n_change = (a)->na_filerev;	\
-			mtx_unlock(&((n)->n_mtx));			\
+			NFSUNLOCKNODE(n);				\
 		}							\
 	} while (0)
 
