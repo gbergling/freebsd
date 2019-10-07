@@ -471,6 +471,8 @@ static struct syscall decoded_syscalls[] = {
 		    { Ptr | IN, 3 }, { Socklent, 4 } } },
 	{ .name = "shm_open", .ret_type = 1, .nargs = 3,
 	  .args = { { ShmName | IN, 0 }, { Open, 1 }, { Octal, 2 } } },
+	{ .name = "shm_rename", .ret_type = 1, .nargs = 3,
+	  .args = { { Name | IN, 0 }, { Name | IN, 1 }, { Hex, 2 } } },
 	{ .name = "shm_unlink", .ret_type = 1, .nargs = 1,
 	  .args = { { Name | IN, 0 } } },
 	{ .name = "shutdown", .ret_type = 1, .nargs = 2,
@@ -903,7 +905,7 @@ print_mask_arg32(bool (*decoder)(FILE *, uint32_t, uint32_t *), FILE *fp,
 
 #ifndef __LP64__
 /*
- * Add argument padding to subsequent system calls afater a Quad
+ * Add argument padding to subsequent system calls after Quad
  * syscall arguments as needed.  This used to be done by hand in the
  * decoded_syscalls table which was ugly and error prone.  It is
  * simpler to do the fixup of offsets at initalization time than when
