@@ -1521,7 +1521,7 @@ vm_page_insert_radixdone(vm_page_t m, vm_object_t object, vm_page_t mpred)
 
 	/*
 	 * Since we are inserting a new and possibly dirty page,
-	 * update the object's OBJ_MIGHTBEDIRTY flag.
+	 * update the object's generation count.
 	 */
 	if (pmap_page_is_write_mapped(m))
 		vm_object_set_writeable_dirty(object);
@@ -1691,7 +1691,8 @@ vm_page_replace(vm_page_t mnew, vm_object_t object, vm_pindex_t pindex)
 
 	/*
 	 * The object's resident_page_count does not change because we have
-	 * swapped one page for another, but OBJ_MIGHTBEDIRTY.
+	 * swapped one page for another, but the generation count should
+	 * change if the page is dirty.
 	 */
 	if (pmap_page_is_write_mapped(mnew))
 		vm_object_set_writeable_dirty(object);
@@ -3420,7 +3421,7 @@ vm_page_dequeue(vm_page_t m)
 	struct vm_pagequeue *pq, *pq1;
 	uint8_t aflags;
 
-	KASSERT(mtx_owned(vm_page_lockptr(m)) || m->object == NULL,
+	KASSERT(mtx_owned(vm_page_lockptr(m)) || m->ref_count == 0,
 	    ("page %p is allocated and unlocked", m));
 
 	for (pq = vm_page_pagequeue(m);; pq = pq1) {
@@ -3474,6 +3475,8 @@ vm_page_enqueue(vm_page_t m, uint8_t queue)
 	vm_page_assert_locked(m);
 	KASSERT(m->queue == PQ_NONE && (m->aflags & PGA_QUEUE_STATE_MASK) == 0,
 	    ("%s: page %p is already enqueued", __func__, m));
+	KASSERT(m->ref_count > 0,
+	    ("%s: page %p does not carry any references", __func__, m));
 
 	m->queue = queue;
 	if ((m->aflags & PGA_REQUEUE) == 0)
@@ -3495,6 +3498,8 @@ vm_page_requeue(vm_page_t m)
 	vm_page_assert_locked(m);
 	KASSERT(vm_page_queue(m) != PQ_NONE,
 	    ("%s: page %p is not logically enqueued", __func__, m));
+	KASSERT(m->ref_count > 0,
+	    ("%s: page %p does not carry any references", __func__, m));
 
 	if ((m->aflags & PGA_REQUEUE) == 0)
 		vm_page_aflag_set(m, PGA_REQUEUE);
@@ -3762,6 +3767,9 @@ vm_page_wire(vm_page_t m)
 /*
  * Attempt to wire a mapped page following a pmap lookup of that page.
  * This may fail if a thread is concurrently tearing down mappings of the page.
+ * The transient failure is acceptable because it translates to the
+ * failure of the caller pmap_extract_and_hold(), which should be then
+ * followed by the vm_fault() fallback, see e.g. vm_fault_quick_hold_pages().
  */
 bool
 vm_page_wire_mapped(vm_page_t m)
@@ -3885,6 +3893,8 @@ vm_page_mvqueue(vm_page_t m, const uint8_t nqueue)
 	vm_page_assert_locked(m);
 	KASSERT((m->oflags & VPO_UNMANAGED) == 0,
 	    ("vm_page_mvqueue: page %p is unmanaged", m));
+	KASSERT(m->ref_count > 0,
+	    ("%s: page %p does not carry any references", __func__, m));
 
 	if (vm_page_queue(m) != nqueue) {
 		vm_page_dequeue(m);
