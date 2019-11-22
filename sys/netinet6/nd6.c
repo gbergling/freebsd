@@ -145,8 +145,10 @@ static int nd6_need_cache(struct ifnet *);
 VNET_DEFINE_STATIC(struct callout, nd6_slowtimo_ch);
 #define	V_nd6_slowtimo_ch		VNET(nd6_slowtimo_ch)
 
-VNET_DEFINE(struct callout, nd6_timer_ch);
+VNET_DEFINE_STATIC(struct callout, nd6_timer_ch);
 #define	V_nd6_timer_ch			VNET(nd6_timer_ch)
+
+SYSCTL_DECL(_net_inet6_icmp6);
 
 static void
 nd6_lle_event(void *arg __unused, struct llentry *lle, int evt)
@@ -1746,7 +1748,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* sync kernel routing table with the default router list */
 		defrouter_reset();
-		defrouter_select();
+		defrouter_select_fib(RT_ALL_FIBS);
 		break;
 	case SIOCSPFXFLUSH_IN6:
 	{
@@ -1786,7 +1788,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 
 		defrouter_reset();
 		nd6_defrouter_flush_all();
-		defrouter_select();
+		defrouter_select_fib(RT_ALL_FIBS);
 		break;
 	}
 	case SIOCGNBRINFO_IN6:
@@ -2328,13 +2330,7 @@ nd6_resolve_slow(struct ifnet *ifp, int flags, struct mbuf *m,
 		}
 	} 
 	if (lle == NULL) {
-		if (!(ND_IFINFO(ifp)->flags & ND6_IFF_PERFORMNUD)) {
-			m_freem(m);
-			return (ENOBUFS);
-		}
-
-		if (m != NULL)
-			m_freem(m);
+		m_freem(m);
 		return (ENOBUFS);
 	}
 
@@ -2577,18 +2573,6 @@ clear_llinfo_pqueue(struct llentry *ln)
 	ln->la_hold = NULL;
 }
 
-static int nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS);
-
-SYSCTL_DECL(_net_inet6_icmp6);
-SYSCTL_PROC(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
-	CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
-	NULL, 0, nd6_sysctl_prlist, "S,in6_prefix",
-	"NDP prefix list");
-SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_MAXQLEN, nd6_maxqueuelen,
-	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(nd6_maxqueuelen), 1, "");
-SYSCTL_INT(_net_inet6_icmp6, OID_AUTO, nd6_gctimer,
-	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(nd6_gctimer), (60 * 60 * 24), "");
-
 static int
 nd6_sysctl_prlist(SYSCTL_HANDLER_ARGS)
 {
@@ -2662,3 +2646,11 @@ out:
 	ND6_RUNLOCK();
 	return (error);
 }
+SYSCTL_PROC(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
+	CTLTYPE_OPAQUE | CTLFLAG_RD | CTLFLAG_MPSAFE,
+	NULL, 0, nd6_sysctl_prlist, "S,in6_prefix",
+	"NDP prefix list");
+SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_MAXQLEN, nd6_maxqueuelen,
+	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(nd6_maxqueuelen), 1, "");
+SYSCTL_INT(_net_inet6_icmp6, OID_AUTO, nd6_gctimer,
+	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(nd6_gctimer), (60 * 60 * 24), "");
