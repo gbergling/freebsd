@@ -323,13 +323,19 @@ tmpfs_access(struct vop_access_args *v)
 	struct vnode *vp = v->a_vp;
 	accmode_t accmode = v->a_accmode;
 	struct ucred *cred = v->a_cred;
-
+	mode_t all_x = S_IXUSR | S_IXGRP | S_IXOTH;
 	int error;
 	struct tmpfs_node *node;
 
 	MPASS(VOP_ISLOCKED(vp));
 
 	node = VP_TO_TMPFS_NODE(vp);
+
+	/*
+	 * Common case path lookup.
+	 */
+	if (__predict_true(accmode == VEXEC && (node->tn_mode & all_x) == all_x))
+		return (0);
 
 	switch (vp->v_type) {
 	case VDIR:
@@ -1572,7 +1578,7 @@ restart:
 				tmpfs_free_node(tm, tnp);
 				return (0);
 			}
-			if ((vp->v_iflag & VI_DOOMED) != 0) {
+			if (VN_IS_DOOMED(vp)) {
 				tmpfs_free_node(tm, tnp);
 				return (ENOENT);
 			}
@@ -1626,7 +1632,11 @@ struct vop_vector tmpfs_vnodeop_entries = {
 	.vop_whiteout =			tmpfs_whiteout,
 	.vop_bmap =			VOP_EOPNOTSUPP,
 	.vop_vptocnp =			tmpfs_vptocnp,
+	.vop_lock1 =			vop_lock,
+	.vop_unlock = 			vop_unlock,
+	.vop_islocked = 		vop_islocked,
 };
+VFS_VOP_VECTOR_REGISTER(tmpfs_vnodeop_entries);
 
 /*
  * Same vector for mounts which do not use namecache.
@@ -1635,3 +1645,4 @@ struct vop_vector tmpfs_vnodeop_nonc_entries = {
 	.vop_default =			&tmpfs_vnodeop_entries,
 	.vop_lookup =			tmpfs_lookup,
 };
+VFS_VOP_VECTOR_REGISTER(tmpfs_vnodeop_nonc_entries);

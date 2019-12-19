@@ -3343,8 +3343,7 @@ softdep_synchronize(bp, ump, caller1)
 	bp->bio_length = 0;
 	bp->bio_done = softdep_synchronize_completed;
 	bp->bio_caller1 = caller1;
-	g_io_request(bp,
-	    (struct g_consumer *)ump->um_devvp->v_bufobj.bo_private);
+	g_io_request(bp, ump->um_cp);
 }
 
 /*
@@ -6294,29 +6293,15 @@ setup_trunc_indir(freeblks, ip, lbn, lastlbn, blkno)
 		return (0);
 	mp = freeblks->fb_list.wk_mp;
 	ump = VFSTOUFS(mp);
-	bp = getblk(ITOV(ip), lbn, mp->mnt_stat.f_iosize, 0, 0, 0);
-	if ((bp->b_flags & B_CACHE) == 0) {
-		bp->b_blkno = blkptrtodb(VFSTOUFS(mp), blkno);
-		bp->b_iocmd = BIO_READ;
-		bp->b_flags &= ~B_INVAL;
-		bp->b_ioflags &= ~BIO_ERROR;
-		vfs_busy_pages(bp, 0);
-		bp->b_iooffset = dbtob(bp->b_blkno);
-		bstrategy(bp);
-#ifdef RACCT
-		if (racct_enable) {
-			PROC_LOCK(curproc);
-			racct_add_buf(curproc, bp, 0);
-			PROC_UNLOCK(curproc);
-		}
-#endif /* RACCT */
-		curthread->td_ru.ru_inblock++;
-		error = bufwait(bp);
-		if (error) {
-			brelse(bp);
-			return (error);
-		}
-	}
+	/*
+	 * Here, calls to VOP_BMAP() will fail.  However, we already have
+	 * the on-disk address, so we just pass it to bread() instead of
+	 * having bread() attempt to calculate it using VOP_BMAP().
+	 */
+	error = breadn_flags(ITOV(ip), lbn, blkptrtodb(ump, blkno),
+	    (int)mp->mnt_stat.f_iosize, NULL, NULL, 0, NOCRED, 0, NULL, &bp);
+	if (error)
+		return (error);
 	level = lbn_level(lbn);
 	lbnadd = lbn_offset(ump->um_fs, level);
 	/*
@@ -12525,7 +12510,7 @@ restart:
 		 * not now, but then the user was not asking to have it
 		 * written, so we are not breaking any promises.
 		 */
-		if (vp->v_iflag & VI_DOOMED)
+		if (VN_IS_DOOMED(vp))
 			break;
 		/*
 		 * We prevent deadlock by always fetching inodes from the
@@ -12546,7 +12531,7 @@ restart:
 			error = ffs_vgetf(mp, parentino, LK_EXCLUSIVE,
 			    &pvp, FFSV_FORCEINSMQ);
 			vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-			if (vp->v_iflag & VI_DOOMED) {
+			if (VN_IS_DOOMED(vp)) {
 				if (error == 0)
 					vput(pvp);
 				error = ENOENT;
@@ -13367,6 +13352,7 @@ softdep_request_cleanup(fs, vp, cred, resource)
 	struct ufsmount *ump;
 	struct mount *mp;
 	long starttime;
+	size_t resid;
 	ufs2_daddr_t needed;
 	int error, failed_vnode;
 
@@ -13442,6 +13428,10 @@ softdep_request_cleanup(fs, vp, cred, resource)
 	}
 	starttime = time_second;
 retry:
+	if (resource == FLUSH_BLOCKS_WAIT &&
+	    fs->fs_cstotal.cs_nbfree <= needed)
+		g_io_speedup(needed * fs->fs_bsize, BIO_SPEEDUP_TRIM, &resid,
+		    ump->um_cp);
 	if ((resource == FLUSH_BLOCKS_WAIT && ump->softdep_on_worklist > 0 &&
 	    fs->fs_cstotal.cs_nbfree <= needed) ||
 	    (resource == FLUSH_INODES_WAIT && fs->fs_pendinginodes > 0 &&
@@ -13754,6 +13744,19 @@ static void
 check_clear_deps(mp)
 	struct mount *mp;
 {
+	struct ufsmount *ump;
+	size_t resid;
+
+	/*
+	 * Tell the lower layers that any TRIM or WRITE transactions
+	 * that have been delayed for performance reasons should
+	 * proceed to help alleviate the shortage faster.
+	 */
+	ump = VFSTOUFS(mp);
+	FREE_LOCK(ump);
+	g_io_speedup(0, BIO_SPEEDUP_TRIM | BIO_SPEEDUP_WRITE, &resid, ump->um_cp);
+	ACQUIRE_LOCK(ump);
+
 
 	/*
 	 * If we are suspended, it may be because of our using
@@ -13761,6 +13764,7 @@ check_clear_deps(mp)
 	 */
 	if (MOUNTEDSUJ(mp) && VFSTOUFS(mp)->softdep_jblocks->jb_suspended)
 		clear_inodedeps(mp);
+
 	/*
 	 * General requests for cleanup of backed up dependencies
 	 */
