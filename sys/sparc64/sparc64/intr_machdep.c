@@ -137,7 +137,7 @@ intrcnt_updatename(int vec, const char *name, int ispil)
 	if (intrnames[0] == '\0') {
 		/* for bitbucket */
 		if (bootverbose)
-			printf("initalizing intr_countp\n");
+			printf("initializing intr_countp\n");
 		intrcnt_setname("???", intrcnt_index++);
 
 		stray_vec_index = intrcnt_index++;
