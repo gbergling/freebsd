@@ -70,7 +70,7 @@ LANG=de_DE.ISO8859-1
 01/11	Besetzung des Ruhrgebietes durch Frankreich und Belgien, 1923
 09/10	Eintritt Deutschlands in den Völkerbund, 1926
 10/25	Schwarzer Freitag in New York, Beginn der Weltwirtschaftskrise, 1929
-
+08/06	Europas erste Autobahn eingeweiht, 1932
 
 /* II. Weltkrieg */
 10/14	Austritt Deutschlands aus dem Völkerbund, 1933
@@ -132,6 +132,7 @@ LANG=de_DE.ISO8859-1
 09/17	Bruch der Sozialliberalen Koalition, 1982
 09/18	Aufnahme von Bundesrepublik und DDR in die UNO, 1973
 10/01	Ablösung von Bundeskanzler Schmidt durch Kohl, 1982
+10/13	Entführung der Lufthansa-Maschine "Landshut" nach Mogadischu, 1977
 10/23	Volksabstimmung im Saargebiet, 1955
 12/02	Washingtoner Abkommen über Bi-Zone, 1946
 12/07	Deutsch-polnischer Vertrag, Warschau 1970
@@ -158,12 +159,13 @@ LANG=de_DE.ISO8859-1
 07/20	Konkordat zwischen Deutschland und dem Vatikan, 1933
 06/30	Röhm-Putsch, Ausschaltung der SA-Führung, 1934
 09/15	Nürnberger Gesetze, 1935
-01/08	Eröffnung der olympischen Spiele in Berlin, 1936
+08/01	Eröffnung der olympischen Spiele in Berlin, 1936
 01/20	Wannseekonferenz, 1942
 04/30	Selbstmord Hitlers, 1945
 07/29	Mussolini geboren, 1883
 
 /* Sozialismus */
+01/19	Markus Johannes Wolf geboren, 1923
 01/21	Lenin gestorben, 1924
 06	Gründung des Bundes der Kommunisten in London
 	durch Marx und Engels, 1847
@@ -177,10 +179,11 @@ LANG=de_DE.ISO8859-1
 01/15	Ermordung von Rosa Luxemburg und Karl Liebknecht, 1919
 03/05	Tod Stalins, 1953
 03/18	Erste demokratische Volkskammerwahl, 1990
+03/27	Chruschtschow wird sowjetischer Präsident, 1958
 04/21	Zwangsvereinigung von KPD und SPD zur SED, 1946
 05/14	Gründung der Warschauer Paktes, 1955
 06/17	Arbeiteraufstand am 17. Juni 1953
-06/25	Begin der Korea-Krieges, 1950
+06/25	Beginn der Korea-Krieges, 1950
 08/13	Bau der Berliner Mauer, 1961
 08/21	Einmarsch des Warschauer Pakts in die Tschechoslowakei, 1968
 10/03	Offizielles Ende der DDR :-), 1990
@@ -194,5 +197,6 @@ LANG=de_DE.ISO8859-1
 03/27	Chruschtschow wird sowjetischer Präsident, 1958
 10/12	Chruschtschow schlägt während einer Rede in der UNO mit den
 	Schuhen auf den Tisch, 1960
+11/10	Sowjetischer Präsident Leonid Breschnew gestorben, Alter 75, 1982
 
 #endif /* _de_DE_ISO8859_1_geschichte_ */
