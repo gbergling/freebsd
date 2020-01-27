@@ -204,7 +204,6 @@ static double tmin = 999999999.0;	/* minimum round trip time */
 static double tmax = 0.0;	/* maximum round trip time */
 static double tsum = 0.0;	/* sum of all times, for doing average */
 static double tsumsq = 0.0;	/* sum of all times squared, for std. dev. */
-struct tv32 tv32_offset;
 
 /* nonzero if we've been told to finish up */
 static volatile sig_atomic_t finish_up;
@@ -654,7 +653,7 @@ main(int argc, char *const *argv)
 		for (i = TIMEVAL_LEN; i < datalen; ++i)
 			*datap++ = i;
 
-	ident = arc4random() & 0xFFFF;
+	ident = getpid() & 0xFFFF;
 
 	hold = 1;
 	if (options & F_SO_DEBUG) {
@@ -854,8 +853,6 @@ main(int argc, char *const *argv)
 			(void)printf("PING %s: %d data bytes\n", hostname, datalen);
 	}
 
-	arc4random_buf(&tv32_offset, sizeof(tv32_offset));
-
 	/*
 	 * Use sigaction() instead of signal() to get unambiguous semantics,
 	 * in particular with SA_RESTART not set.
@@ -1046,11 +1043,6 @@ pinger(void)
 	CLR(ntransmitted % mx_dup_ck);
 
 	if ((options & F_TIME) || timing) {
-		(void)gettimeofday(&now, NULL);
-
-		if (options & F_TIME)
-			icp->icmp_otime = htonl((now.tv_sec + tv32_offset.tv32_sec % (24*60*60))
-				* 1000 + now.tv_usec + tv32_offset.tv32_usec / 1000);
 		(void)clock_gettime(CLOCK_MONOTONIC, &now);
 		/*
 		 * Truncate seconds down to 32 bits in order
@@ -1058,13 +1050,11 @@ pinger(void)
 		 * packet. We're only concerned with
 		 * durations, not absolute times.
 		 */
-		tv32.tv32_sec = (uint32_t)htonl(now.tv_sec + tv32_offset.tv32_sec);
-		tv32.tv32_nsec = (uint32_t)htonl(now.tv_nsec + tv32_offset.tv32_nsec);
-		
+		tv32.tv32_sec = (uint32_t)htonl(now.tv_sec);
+		tv32.tv32_nsec = (uint32_t)htonl(now.tv_nsec);
 		if (options & F_TIME)
 			icp.icmp_otime = htonl((now.tv_sec % (24*60*60))
 				* 1000 + now.tv_nsec / 1000000);
-		
 		if (timing)
 			bcopy((void *)&tv32,
 			    (void *)&outpack[ICMP_MINLEN + phdr_len],
@@ -1182,8 +1172,8 @@ pr_pack(char *buf, ssize_t cc, struct sockaddr_in *from, struct timespec *tv)
 			    sizeof(tv1)) {
 				/* Copy to avoid alignment problems: */
 				memcpy(&tv32, tp, sizeof(tv32));
-				tv1.tv_sec = ntohl(tv32.tv32_sec) - tv32_offset.tv32_sec;
-				tv1.tv_nsec = ntohl(tv32.tv32_nsec) - tv32_offset.tv32_nsec;
+				tv1.tv_sec = ntohl(tv32.tv32_sec);
+				tv1.tv_nsec = ntohl(tv32.tv32_nsec);
 				timespecsub(tv, &tv1, tv);
  				triptime = ((double)tv->tv_sec) * 1000.0 +
 				    ((double)tv->tv_nsec) / 1000000.0;
