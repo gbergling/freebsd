@@ -173,8 +173,12 @@ hwpstate_goto_pstate(device_t dev, int id)
 	/* get the current pstate limit */
 	msr = rdmsr(MSR_AMD_10H_11H_LIMIT);
 	limit = AMD_10H_11H_GET_PSTATE_LIMIT(msr);
-	if (limit > id)
+	if (limit > id) {
+		HWPSTATE_DEBUG(dev,
+		    "Restricting requested P%d to P%d due to HW limit\n", id,
+		    limit);
 		id = limit;
+	}
 
 	cpu = curcpu;
 	HWPSTATE_DEBUG(dev, "setting P%d-state on cpu%d\n", id, cpu);
@@ -315,7 +319,8 @@ hwpstate_identify(driver_t *driver, device_t parent)
 	if (device_find_child(parent, "hwpstate", -1) != NULL)
 		return;
 
-	if (cpu_vendor_id != CPU_VENDOR_AMD || CPUID_TO_FAMILY(cpu_id) < 0x10)
+	if ((cpu_vendor_id != CPU_VENDOR_AMD || CPUID_TO_FAMILY(cpu_id) < 0x10) &&
+	    cpu_vendor_id != CPU_VENDOR_HYGON)
 		return;
 
 	/*
@@ -446,6 +451,7 @@ hwpstate_get_info_from_msr(device_t dev)
 			hwpstate_set[i].freq = (100 * (fid + 0x10)) >> did;
 			break;
 		case 0x17:
+		case 0x18:
 			did = AMD_17H_CUR_DID(msr);
 			if (did == 0) {
 				HWPSTATE_DEBUG(dev, "unexpected did: 0\n");
@@ -455,8 +461,10 @@ hwpstate_get_info_from_msr(device_t dev)
 			hwpstate_set[i].freq = (200 * fid) / did;
 			break;
 		default:
-			HWPSTATE_DEBUG(dev, "get_info_from_msr: AMD family"
-			    " 0x%02x CPUs are not supported yet\n", family);
+			HWPSTATE_DEBUG(dev, "get_info_from_msr: %s family"
+			    " 0x%02x CPUs are not supported yet\n",
+			    cpu_vendor_id == CPU_VENDOR_HYGON ? "Hygon" : "AMD",
+			    family);
 			return (ENXIO);
 		}
 		hwpstate_set[i].pstate_id = i;
