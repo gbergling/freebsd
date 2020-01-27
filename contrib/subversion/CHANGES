@@ -1,5 +1,131 @@
+Version 1.10.6
+(24 Jul 2019, from /branches/1.10.x)
+https://svn.apache.org/repos/asf/subversion/tags/1.10.6
+
+ User-visible changes:
+    * Allow the use of empty groups in authz rules. (r1854883)
+    * Fix conflict resolver case with move vs move conflicts. (r1863297)
+    * Fix #4760: Missing children in svnadmin dump --include/exclude. (r1863298)
+    * Fix #4793: authz rights from inverted access selectors. (r1854882)
+    * Fix conflict resolver bug: local and incoming edits swapped. (r1863300)
+    * Fix #4806: Remove on-disk trees with read-only dirs. (r1863299)
+    * Fix memory lifetime problem in a libsvn_wc error code path. (r1863302)
+    * No tree conflict when 'svn up' deletes unmodified dir with unversioned items. (r1863296)
+    * Remove a useless common ancestor search from conflict resolver. (r1863294)
+
+ Developer-visible changes:
+    * Allow generating Visual Studio 2019 projects (r1863304)
+    * Fix a use-after-free in mod_dav_svn's logging of FS warnings. (r1863292)
+    * Fix "unused static function" warning in release-mode builds. (r1854884)
+    * Fix build with APR 1.7.0. (r1863303)
+    * Fix issue #4804: spurious SQLite-related test failures. (r1863295)
+    * Allow svnserve's 'get-deleted-rev' API to return 'not deleted'. (r1863305)
+    * Silence a deprecation warning from amalgamated SQLite on macOS. (r1863291)
+
+
+Version 1.10.5
+(Not released; see changes for 1.10.6.)
+
+
+Version 1.10.4
+(11 Jan 2019, from /branches/1.10.x)
+http://svn.apache.org/repos/asf/subversion/tags/1.10.4
+
+ User-visible changes:
+  - Minor new features and improvements:
+    * Conflict resolver support for added vs unversioned file (r1845577)
+    * Conflict resolver support for unversioned directories (r1846299)
+
+  - Client-side bugfixes:
+    * Fix: repos-to-WC copy with --parents doesn't create dirs (#4768)
+    * Fix: foreign repo copy with peg/operative revisions (#4785)
+    * Fix: foreign repo copy of file adding mergeinfo (#4792)
+    * Fix: assertion failure using -rPREV on a working copy at r0 (#4532)
+    * Fix: tree conflict message ends a sentence with a colon (#4717)
+
+  - Server-side bugfixes:
+    * Fix CVE-2018-11803: malicious SVN clients can crash mod_dav_svn
+    * Fix: unexpected SVN_ERR_FS_NOT_DIRECTORY errors (#4791)
+    * Fix: mod_dav_svn's SVNUseUTF8 had no effect in some setups (r1844882)
+    * Fix crash in mod_http2 (#4782)
+
+  - Other tool improvements and bugfixes:
+    * svndumpfilter: Clarify error messages by including node path (r1845261)
+
+  - Bindings bugfixes:
+    * JavaHL: Fix crash in client code when using external diff (r1845408)
+
+ Developer-visible changes:
+  - General:
+    * Fix build on systems without python in $PATH (r1845555)
+
+  - API changes:
+    (none)
+
+
+Version 1.10.3
+(10 Oct 2018, from /branches/1.10.x)
+http://svn.apache.org/repos/asf/subversion/tags/1.10.3
+
+ User-visible changes:
+  - Minor new features and improvements:
+    * Store the HTTPS client cert password (r1842578)
+
+  - Client-side bugfixes:
+    * Fix shelving when custom diff command is configured (issue #4758)
+    * Fix conflict resolver crashes (issue #4744, r1842581, r1842582, r1842583)
+    * Fix conflict resolver endless scan in some cases (r1842586)
+    * Fix "Accept incoming deletion" on locally deleted file (issue #4739)
+    * Fix "resolver adds unrelated moves to move target list" (issue #4766)
+
+  - Server-side bugfixes:
+    * Reject bad PUT before CHECKOUT in v1 HTTP protocol (r1841281)
+    * Let 'svnadmin recover' prune the rep-cache even if disabled (r1842585)
+
+  - Client-side and server-side bugfixes:
+    * Allow commands like 'svn ci --file X' to work when X is a FIFO (r1841282)
+
+  - Other tool improvements and bugfixes:
+    * 'svnadmin verify --keep-going --quiet' shows an error summary (r1842584)
+    * Fix error in german translation for 'svn help merge' (r1837038)
+
+ Developer-visible changes:
+  - General:
+    * Python tests use the current python executable (r1842626)
+
+
+Version 1.10.2
+(20 Jul 2018, from /branches/1.10.x)
+http://svn.apache.org/repos/asf/subversion/tags/1.10.2
+
+ User-visible changes:
+  - Client-side bugfixes:
+    * Correctly claim to offer Gnome Keyring support with libsecret (r1831142)
+    * Fix segfault using Gnome Keyring with libsecret (r1835782)
+    * Fix JavaHL local refs capacity warning when unparsing externals (r1831143)
+    * Since on Windows Subversion does not handle symlinks, never check for reparse points (r1835701)
+    * Prune externals after 'update --set-depth=exclude' (r1835702)
+    * Fix issue #4740, "conflict resolver searches too far back ..." (r1835703)
+  - Server-side bugfixes:
+    * Fix regression issue #4741: authz group refers to multiple groups (r1831220)
+
+ Developer-visible changes:
+  - General:
+    * Regression test and FSFS checksum test, part of issue #4722 (r1828043)
+    * Explicit error on configure --without-lz4 or --without-utf8proc (r1831604)
+    * configure.ac: Fix regression relating to path to 'rdoc' (r1833486)
+    * Ensure consistent use of $PYTHON during build and test (r1833487)
+    * Fix libsvn_auth_gnome_keyring.pc when built using libsecret (r1835781)
+  - Bindings:
+    * Fix regression in use of pre-generated Swig bindings in release builds (r1833488)
+
+
+Version 1.10.1
+(Not released; see changes for 1.10.2.)
+
+
 Version 1.10.0
-(?? ??? 2018, from /branches/1.10.x)
+(13 Apr 2018, from /branches/1.10.x)
 http://svn.apache.org/repos/asf/subversion/tags/1.10.0
 
 See the 1.10 release notes for a more verbose overview of the changes since
@@ -8,7 +134,7 @@ the 1.9 release:  https://subversion.apache.org/docs/release-notes/1.10.html
  User-visible changes:
   - Major new features:
     * Better interactive conflict resolution for tree conflicts (r1687489 et al)
-    * Wilcards and improved performance in path-based authorization (r1776832)
+    * Wildcards and improved performance in path-based authorization (r1776832)
     * New experimental 'svn shelve' command (issue #3625)
   - Minor new features and improvements:
     * svnbench: Show time taken & bytes transferred (r1703383, r1710586)
@@ -29,7 +155,7 @@ the 1.9 release:  https://subversion.apache.org/docs/release-notes/1.10.html
     * ra_serf: Adjustments for serf versions with HTTP/2 support (r1716400)
     * ra_serf: Send svndiff1 deltas during commit (r1704317, r1704613, r1791290)
     * ra_serf: Stream svndiff deltas w/o creating temporary files (r1803143 et al)
-    * ra_serf: Don't necessarily request full MERGE reponses (r1806017 et al)
+    * ra_serf: Don't necessarily request full MERGE responses (r1806017 et al)
     * 'svn patch': Parse binary diffs in git-style patches (r1703925)
     * 'svnadmin info' now reports latest revision in the repository (r1697953)
     * ra_svn: Various performance-related tweaks (r1694490)
@@ -284,6 +410,102 @@ the 1.9 release:  https://subversion.apache.org/docs/release-notes/1.10.html
     * JavaHL: Add missing exception checks (r1801108)
     * Ruby: Fix handling of NULL MD5 digests (r1811786)
     * Ruby: Detect versions up to 2.4 (r1806570)
+
+
+Version 1.9.12
+(24 Jul 2019, from /branches/1.9.x)
+https://svn.apache.org/repos/asf/subversion/tags/1.9.12
+
+ User-visible changes:
+    * No tree conflict when 'svn up' deletes unmodified dir with unversioned items. (r1863309)
+
+ Developer-visible changes:
+    * Allow generating Visual Studio 2019 projects (r1863311)
+    * Fix a use-after-free in mod_dav_svn's logging of FS warnings. (r1863307)
+    * Fix "unused static function" warning in release-mode builds. (r1854881)
+    * Fix build with APR 1.7.0. (r1863310)
+    * Fix issue #4804: spurious SQLite-related test failures. (r1863308)
+    * Allow svnserve's 'get-deleted-rev' API to return 'not deleted'. (r1863312)
+    * Silence a deprecation warning from amalgamated SQLite on macOS. (r1863306)
+
+
+Version 1.9.11
+(Not released; see changes for 1.9.12.)
+
+
+Version 1.9.10
+(11 Jan 2019, from /branches/1.9.x)
+http://svn.apache.org/repos/asf/subversion/tags/1.9.10
+
+ User-visible changes:
+  - Client-side bugfixes:
+    * Fix: repos-to-WC copy with --parents doesn't create dirs (#4768)
+    * Fix: foreign repo copy with peg/operative revisions (#4785)
+    * Fix: assertion failure using -rPREV on a working copy at r0 (#4532)
+    * Fix: german translation for 'svn help merge' (r1837037)
+    * Fix: prune externals after 'update --set-depth=exclude' (r1830883 et al.)
+    * Fix: detection of GPG-agent (r1794166 et al.)
+    * Fix: null updates don't update last-changed-revision (#4700)
+    * Fix: merge "Unable to parse reversed revision range" (#4686)
+
+  - Server-side bugfixes:
+    * Fix: unexpected SVN_ERR_FS_NOT_DIRECTORY errors (#4791)
+    * Fix: mod_dav_svn's SVNUseUTF8 had no effect in some setups (r1844882)
+    * Fix: crash in mod_http2 (#4782)
+    * Fix: 'svnadmin upgrade' of BDB: Error out on too-new formats (r1804013)
+    * Fix: Enforce v1 HTTP protocol: error if PUT before CHECKOUT (r1833465)
+    * Fix: Let 'svnadmin recover' prune rep-cache even if disabled (r1838813)
+    * Add test and FSFS checksum verification for issue #4722 (r1826720 et al.)
+
+  - Other tool improvements and bugfixes:
+    * Install 'fsfs-stats' wrapper for 1.8 compat (r1802032 et al.)
+    * Note that 'tools/client-side/detach.py' doesn't work on 1.8+ (r1696722)
+
+  - Bindings bugfixes:
+    * JavaHL: Fix crash in client code when using external diff (r1845408)
+    * JavaHL: SSL server trust prompt: allow accepting temporarily (r1820718)
+
+ Developer-visible changes:
+  - General:
+    (none)
+
+  - API changes:
+    (none)
+
+
+Version 1.9.9
+(20 Jul 2018, from /branches/1.9.x)
+http://svn.apache.org/repos/asf/subversion/tags/1.9.9
+
+ User-visible changes:
+  - Client-side bugfixes:
+    * Fix SEGV for 'svn export -rN WC' with relative externals (r1803755)
+    * Fix issue #4677: 'svn up' after a directory replaced a file (r1814248)
+    * Fix segfault when no home directory is available (r1819199)
+    * Performance: Make 'svn info' fast on old repository revisions (r1827690)
+    * Fix RA-serf problem with proxy username and password (r1833571)
+
+  - Server-side bugfixes:
+    * svnadmin: Fix false errors on some valid LOCK_PATH arguments (r1803754)
+    * Fix crash when exiting 'svnserve --config-file' (r1824405)
+    * Fix issue #4722: false "filesystem is corrupt" error on commit (r1827688)
+    * Reword confusing "nested" wording in an httpd.conf warning (r1835700)
+
+  - Bindings bugfixes:
+    * swig-py: svn.core.Stream supports raw binary file-like objects (r1820620)
+    * swig-rb: Don't crash if svn_md5_digest_to_cstring returns NULL (r1823805)
+
+ Developer-visible changes:
+  - General:
+    * Fix CVE-2017-9800: Malicious server can execute arbitrary command on client (r1804698)
+    * Fix test failure if compile- and run-time HTTPD versions differ (r1820523)
+
+  - API changes:
+    (none)
+
+
+Version 1.9.8
+(Not released; see changes for 1.9.9.)
 
 
 Version 1.9.7
@@ -5720,7 +5942,7 @@ http://svn.apache.org/repos/asf/subversion/tags/0.28.2
       twice as slow and lose all concurrent-client scalability.
 
       This is a temporary fix for a larger design problem.  See issue
-      http://subversion.tigris.org/issues/show_bug.cgi?id=1499
+      https://issues.apache.org/jira/browse/SVN-1499
 
 
 Version 0.28.1

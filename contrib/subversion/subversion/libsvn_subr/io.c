@@ -342,8 +342,13 @@ io_check_path(const char *path,
   /* Not using svn_io_stat() here because we want to check the
      apr_err return explicitly. */
   SVN_ERR(cstring_from_utf8(&path_apr, path, pool));
-
+#ifdef WIN32
+  /* on Windows, svn does not handle reparse points or hard links.
+     So ignore the 'resolve_symlinks' flag. */
+  flags = APR_FINFO_MIN;
+#else
   flags = resolve_symlinks ? APR_FINFO_MIN : (APR_FINFO_MIN | APR_FINFO_LINK);
+#endif
   apr_err = apr_stat(&finfo, path_apr, flags, pool);
 
   if (APR_STATUS_IS_ENOENT(apr_err))
@@ -1617,13 +1622,14 @@ merge_default_file_perms(apr_file_t *fd,
    that attempts to honor the users umask when dealing with
    permission changes.  It is a no-op when invoked on a symlink. */
 static svn_error_t *
-io_set_file_perms(const char *path,
-                  svn_boolean_t change_readwrite,
-                  svn_boolean_t enable_write,
-                  svn_boolean_t change_executable,
-                  svn_boolean_t executable,
-                  svn_boolean_t ignore_enoent,
-                  apr_pool_t *pool)
+io_set_perms(const char *path,
+             svn_boolean_t is_file,
+             svn_boolean_t change_readwrite,
+             svn_boolean_t enable_write,
+             svn_boolean_t change_executable,
+             svn_boolean_t executable,
+             svn_boolean_t ignore_enoent,
+             apr_pool_t *pool)
 {
   apr_status_t status;
   const char *path_apr;
@@ -1643,9 +1649,16 @@ io_set_file_perms(const char *path,
                             || SVN__APR_STATUS_IS_ENOTDIR(status)))
         return SVN_NO_ERROR;
       else if (status != APR_ENOTIMPL)
-        return svn_error_wrap_apr(status,
-                                  _("Can't change perms of file '%s'"),
-                                  svn_dirent_local_style(path, pool));
+        {
+          if (is_file)
+            return svn_error_wrap_apr(status,
+                                      _("Can't change perms of file '%s'"),
+                                      svn_dirent_local_style(path, pool));
+          else
+            return svn_error_wrap_apr(status,
+                                      _("Can't change perms of directory '%s'"),
+                                      svn_dirent_local_style(path, pool));
+        }
       return SVN_NO_ERROR;
     }
 
@@ -1745,10 +1758,50 @@ io_set_file_perms(const char *path,
       status = apr_file_attrs_set(path_apr, attrs, attrs_values, pool);
     }
 
-  return svn_error_wrap_apr(status,
-                            _("Can't change perms of file '%s'"),
-                            svn_dirent_local_style(path, pool));
+  if (is_file)
+    {
+      return svn_error_wrap_apr(status,
+                                _("Can't change perms of file '%s'"),
+                                svn_dirent_local_style(path, pool));
+    }
+  else
+    {
+      return svn_error_wrap_apr(status,
+                                _("Can't change perms of directory '%s'"),
+                                svn_dirent_local_style(path, pool));
+    }
 }
+
+static svn_error_t *
+io_set_file_perms(const char *path,
+                  svn_boolean_t change_readwrite,
+                  svn_boolean_t enable_write,
+                  svn_boolean_t change_executable,
+                  svn_boolean_t executable,
+                  svn_boolean_t ignore_enoent,
+                  apr_pool_t *pool)
+{
+  return svn_error_trace(io_set_perms(path, TRUE,
+                                      change_readwrite, enable_write,
+                                      change_executable, executable,
+                                      ignore_enoent, pool));
+}
+
+static svn_error_t *
+io_set_dir_perms(const char *path,
+                 svn_boolean_t change_readwrite,
+                 svn_boolean_t enable_write,
+                 svn_boolean_t change_executable,
+                 svn_boolean_t executable,
+                 svn_boolean_t ignore_enoent,
+                 apr_pool_t *pool)
+{
+  return svn_error_trace(io_set_perms(path, FALSE,
+                                      change_readwrite, enable_write,
+                                      change_executable, executable,
+                                      ignore_enoent, pool));
+}
+
 #endif /* !WIN32 && !__OS2__ */
 
 #ifdef WIN32
@@ -2110,6 +2163,55 @@ svn_io_set_file_read_write_carefully(const char *path,
   return svn_io_set_file_read_only(path, ignore_enoent, pool);
 }
 
+#if defined(WIN32) || defined(__OS2__)
+/* Helper for svn_io_set_file_read_* */
+static svn_error_t *
+io_set_readonly_flag(const char *path_apr, /* file-system path */
+                     const char *path,     /* UTF-8 path */
+                     svn_boolean_t set_flag,
+                     svn_boolean_t is_file,
+                     svn_boolean_t ignore_enoent,
+                     apr_pool_t *pool)
+{
+  apr_status_t status;
+
+  status = apr_file_attrs_set(path_apr,
+                              (set_flag ? APR_FILE_ATTR_READONLY : 0),
+                              APR_FILE_ATTR_READONLY,
+                              pool);
+
+  if (status && status != APR_ENOTIMPL)
+    if (!(ignore_enoent && (APR_STATUS_IS_ENOENT(status)
+                            || SVN__APR_STATUS_IS_ENOTDIR(status))))
+      {
+        if (is_file)
+          {
+            if (set_flag)
+              return svn_error_wrap_apr(status,
+                                        _("Can't set file '%s' read-only"),
+                                        svn_dirent_local_style(path, pool));
+            else
+              return svn_error_wrap_apr(status,
+                                        _("Can't set file '%s' read-write"),
+                                        svn_dirent_local_style(path, pool));
+          }
+        else
+          {
+            if (set_flag)
+              return svn_error_wrap_apr(status,
+                                        _("Can't set directory '%s' read-only"),
+                                        svn_dirent_local_style(path, pool));
+            else
+              return svn_error_wrap_apr(status,
+                                        _("Can't set directory '%s' read-write"),
+                                        svn_dirent_local_style(path, pool));
+          }
+      }
+  return SVN_NO_ERROR;
+}
+#endif
+
+
 svn_error_t *
 svn_io_set_file_read_only(const char *path,
                           svn_boolean_t ignore_enoent,
@@ -2121,24 +2223,11 @@ svn_io_set_file_read_only(const char *path,
   return io_set_file_perms(path, TRUE, FALSE, FALSE, FALSE,
                            ignore_enoent, pool);
 #else
-  apr_status_t status;
   const char *path_apr;
 
   SVN_ERR(cstring_from_utf8(&path_apr, path, pool));
-
-  status = apr_file_attrs_set(path_apr,
-                              APR_FILE_ATTR_READONLY,
-                              APR_FILE_ATTR_READONLY,
-                              pool);
-
-  if (status && status != APR_ENOTIMPL)
-    if (!(ignore_enoent && (APR_STATUS_IS_ENOENT(status)
-                            || SVN__APR_STATUS_IS_ENOTDIR(status))))
-      return svn_error_wrap_apr(status,
-                                _("Can't set file '%s' read-only"),
-                                svn_dirent_local_style(path, pool));
-
-  return SVN_NO_ERROR;
+  return io_set_readonly_flag(path_apr, path,
+                              TRUE, TRUE, ignore_enoent, pool);
 #endif
 }
 
@@ -2154,23 +2243,11 @@ svn_io_set_file_read_write(const char *path,
   return io_set_file_perms(path, TRUE, TRUE, FALSE, FALSE,
                            ignore_enoent, pool);
 #else
-  apr_status_t status;
   const char *path_apr;
 
   SVN_ERR(cstring_from_utf8(&path_apr, path, pool));
-
-  status = apr_file_attrs_set(path_apr,
-                              0,
-                              APR_FILE_ATTR_READONLY,
-                              pool);
-
-  if (status && status != APR_ENOTIMPL)
-    if (!ignore_enoent || !APR_STATUS_IS_ENOENT(status))
-      return svn_error_wrap_apr(status,
-                                _("Can't set file '%s' read-write"),
-                                svn_dirent_local_style(path, pool));
-
-  return SVN_NO_ERROR;
+  return io_set_readonly_flag(path_apr, path,
+                              FALSE, TRUE, ignore_enoent, pool);
 #endif
 }
 
@@ -2541,9 +2618,10 @@ stringbuf_from_aprfile(svn_stringbuf_t **result,
     {
       apr_finfo_t finfo = { 0 };
 
-      /* In some cases we get size 0 and no error for non files,
-          so we also check for the name. (= cached in apr_file_t) */
-      if (! apr_file_info_get(&finfo, APR_FINFO_SIZE, file) && finfo.fname)
+      /* In some cases we get size 0 and no error for non files, so we
+         also check for the name. (= cached in apr_file_t) and for FIFOs */
+      if (! apr_file_info_get(&finfo, APR_FINFO_SIZE | APR_FINFO_TYPE, file)
+          && finfo.fname && finfo.filetype != APR_PIPE)
         {
           /* we've got the file length. Now, read it in one go. */
           svn_boolean_t eof;
@@ -2745,6 +2823,12 @@ svn_io_remove_dir2(const char *path, svn_boolean_t ignore_enoent,
         }
       return svn_error_trace(err);
     }
+
+  /* On Unix, nothing can be removed from a non-writable directory. */
+#if !defined(WIN32) && !defined(__OS2__)
+  SVN_ERR(io_set_dir_perms(path, TRUE, TRUE, FALSE, FALSE,
+                           ignore_enoent, pool));
+#endif
 
   for (hi = apr_hash_first(subpool, dirents); hi; hi = apr_hash_next(hi))
     {
@@ -4484,8 +4568,17 @@ svn_io_dir_remove_nonrecursive(const char *dirname, apr_pool_t *pool)
   {
     svn_boolean_t retry = TRUE;
 
+    if (APR_STATUS_IS_EACCES(status) || APR_STATUS_IS_EEXIST(status))
+      {
+        /* Make the destination directory writable because Windows
+           forbids deleting read-only items. */
+        SVN_ERR(io_set_readonly_flag(dirname_apr, dirname,
+                                     FALSE, FALSE, TRUE, pool));
+        status = apr_dir_remove(dirname_apr, pool);
+      }
+
     if (status == APR_FROM_OS_ERROR(ERROR_DIR_NOT_EMPTY))
-    {
+      {
         apr_status_t empty_status = dir_is_empty(dirname_apr, pool);
 
         if (APR_STATUS_IS_ENOTEMPTY(empty_status))

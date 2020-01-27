@@ -18,7 +18,8 @@ SRCS=		apr_cpystrn.c apr_fnmatch.c apr_getpass.c apr_hash.c apr_skiplist.c \
 		shm.c signals.c sockaddr.c socket_util.c sockets.c \
 		sockopt.c solaris.c start.c tempdir.c thread.c thread_cond.c \
 		thread_mutex.c thread_rwlock.c threadpriv.c time.c \
-		timestr.c userinfo.c version.c waitio.c z_asio.c
+		timestr.c userinfo.c version.c waitio.c z_asio.c \
+		apr_cstr.c apr_encode.c builtins64.c mutex64.c wakeup.c
 
 .PATH:		${APR}/atomic/unix ${APR}/dso/unix ${APR}/file_io/unix \
 		${APR}/locks/unix ${APR}/memory/unix ${APR}/misc/unix \
@@ -26,9 +27,9 @@ SRCS=		apr_cpystrn.c apr_fnmatch.c apr_getpass.c apr_hash.c apr_skiplist.c \
 		${APR}/poll/unix ${APR}/random/unix ${APR}/shmem/unix \
 		${APR}/strings ${APR}/support/unix ${APR}/tables \
 		${APR}/threadproc/unix ${APR}/time/unix ${APR}/user/unix \
-		${APR}/include
+		${APR}/include ${APR}/encoding
 
 CFLAGS+= 	-DHAVE_CONFIG_H -I${.CURDIR} \
-		-I${APR}/include/arch/unix -I${APR}/include
+		-I${APR}/include/arch/unix -I${APR}/include -I${APR}/include/private
 
 .include <bsd.lib.mk>
